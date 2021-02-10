@@ -36,36 +36,28 @@ else:
   lines = f.readlines()
   for line in lines:
     try:
-      #print('http://'+line.strip())
       if (('http://' or 'https://' ) in line.strip()):
         url = line.strip()
       else:
         url = 'http://'+line.strip()
-      #r = requests.get(url, timeout=5)
       s = requests.Session()
       retry = Retry(connect=3, backoff_factor=0.5)
       
-      #s.mount('http://', HTTPAdapter(max_retries=retry))
-      #s.mount('https://', HTTPAdapter(max_retries=retry))
       s.mount('http://stackoverflow.com', HTTPAdapter(max_retries=5))
       r = s.get(url, timeout=5)
     except requests.ConnectionError as e:
       print(bcolors.FAIL + "[!] : Connection ERROR (Max retries exceeded) on : " +bcolors.ENDC+url+"\n")
-      #print(str(e))
       continue
     except requests.Timeout as e:
         print("[!] : Timeout Error")
-        #print(str(e))
         continue
     except requests.RequestException as e:
         print("[!] : General Error")
-        #print(str(e))
         continue
     
     except KeyboardInterrupt:
         exit()
     
-    #l = ['script','login','password','register','passwd','key','api','email','login','logout']
     
     if (r.status_code == 200):
         print('\x1b[6;30;42m' + '[OK] : 200' + '\x1b[0m', ':' , line,end='')

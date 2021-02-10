@@ -68,11 +68,12 @@ else:
     #l = ['script','login','password','register','passwd','key','api','email','login','logout']
     
     if (r.status_code == 200):
-        print('\x1b[6;30;42m' + '[OK] : 200' + '\x1b[0m', ':' , line)
+        print('\x1b[6;30;42m' + '[OK] : 200' + '\x1b[0m', ':' , line,end='')
     else:
-        print(r.status_code ,' : ' , line)
-
-    if (('script' in r.text) and (len(r.text) > 2)):
-      print('Might be interesting')
+        print(r.status_code ,' : ' , line,end='')
     
+    if (('<script' in r.text) and (len(r.text) > 2)):
+      print('> Might be interesting')
+    
+    print('\n')
     

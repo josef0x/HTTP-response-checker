@@ -10,7 +10,7 @@ In brief :
 2) For each one of them it prints the corresponding status code and stores the final result in the format ```URL:status-code```
 
 ## TODO:
-Make the script multi-threaded !
+> Make the script multi-threaded !
 
 ## Usage : 
 ```python3 checker.py URLs.txt```

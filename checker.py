@@ -4,20 +4,23 @@
 # version : 1.01
 
 import requests,sys
+import concurrent.futures
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import argparse
 from datetime import datetime
 import logging
+from tqdm import tqdm
 
-print('''
-\t██╗░░░██╗██████╗░██╗░░░░░  ░█████╗░██╗░░██╗███████╗░█████╗░██╗░░██╗███████╗██████╗░
-\t██║░░░██║██╔══██╗██║░░░░░  ██╔══██╗██║░░██║██╔════╝██╔══██╗██║░██╔╝██╔════╝██╔══██╗
-\t██║░░░██║██████╔╝██║░░░░░  ██║░░╚═╝███████║█████╗░░██║░░╚═╝█████═╝░█████╗░░██████╔╝
-\t██║░░░██║██╔══██╗██║░░░░░  ██║░░██╗██╔══██║██╔══╝░░██║░░██╗██╔═██╗░██╔══╝░░██╔══██╗
-\t╚██████╔╝██║░░██║███████╗  ╚█████╔╝██║░░██║███████╗╚█████╔╝██║░╚██╗███████╗██║░░██║
-\t░╚═════╝░╚═╝░░╚═╝╚══════╝  ░╚════╝░╚═╝░░╚═╝╚══════╝░╚════╝░╚═╝░░╚═╝╚══════╝╚═╝░░╚═╝
-''')
+def print_ascii_title():
+	print('''
+	\t██╗░░░██╗██████╗░██╗░░░░░  ░█████╗░██╗░░██╗███████╗░█████╗░██╗░░██╗███████╗██████╗░
+	\t██║░░░██║██╔══██╗██║░░░░░  ██╔══██╗██║░░██║██╔════╝██╔══██╗██║░██╔╝██╔════╝██╔══██╗
+	\t██║░░░██║██████╔╝██║░░░░░  ██║░░╚═╝███████║█████╗░░██║░░╚═╝█████═╝░█████╗░░██████╔╝
+	\t██║░░░██║██╔══██╗██║░░░░░  ██║░░██╗██╔══██║██╔══╝░░██║░░██╗██╔═██╗░██╔══╝░░██╔══██╗
+	\t╚██████╔╝██║░░██║███████╗  ╚█████╔╝██║░░██║███████╗╚█████╔╝██║░╚██╗███████╗██║░░██║
+	\t░╚═════╝░╚═╝░░╚═╝╚══════╝  ░╚════╝░╚═╝░░╚═╝╚══════╝░╚════╝░╚═╝░░╚═╝╚══════╝╚═╝░░╚═╝
+	''')
 
 class colors:
     """
@@ -39,15 +42,15 @@ def parse_arguments():
         parses the list of arguments 
     '''
     parser = argparse.ArgumentParser(
-            description='HTTP response checker as a name is self-descriptive.'\
-            'It checks the HTTP response of a list of URLs stored in a file,' \
-            'prints each URL\'s response status' \
-            '(w/ the corresponding HTTP code) to the standard output.' \
+            description='As the name indicates HTTP response checker ' \
+            'is self-descriptive. It checks the HTTP response of a list of '\
+            'URLs stored in a file, prints each URL\'s response status' \
+            'to the standard output.' \
             'If no output file is supplied, the results are still stored in' \
             'the directory output_files/')
 
     parser.add_argument(
-            '-f',
+            '-i',
             dest='input_file',
             help='name of the file containing the list of URLs to check.',
             required=True)
@@ -59,13 +62,17 @@ def parse_arguments():
             help='name of the file in which the results should be stored.')
 
     return parser.parse_args() 
-    
-def display_response(url, http_code):
-    if http_code == 200:
-        print("\n", colors.OKGREEN + '[OK] : 200', colors.ENDC, ':' , url)
-    else:
-        print('\n', colors.WARNING, r.status_code , colors.ENDC, ' : ' , url)
 
+def get_response(url, timeout=10):
+    s = requests.Session()
+    r = s.get(url, timeout=timeout)
+
+    if r.status_code == 200:
+        # print(f'{colors.OKGREEN} [OK] : 200 {colors.ENDC} : {url}')
+        return f'[OK] : 200 {url}\n'
+
+    # print(f'{colors.WARNING} {r.status_code} {colors.ENDC} : {url}')
+    return f'{r.status_code} : {url}\n'
 
 def main():
     '''
@@ -88,41 +95,51 @@ def main():
 
     out = open(output_file, 'w+')
 
-    # At this point lines is a list containing the URLs inside the text file
-    for line in lines:
-    
-        # Checking if the HTTP/HTTPS URI Scheme is present
-        if 'http://' in line.strip() or 'https://' in line.strip():
-            url = line.strip()
-        else:
-            # Add http:// if not specified
-            url = 'http://' + line.strip()
-
-        try:
-            s = requests.Session()
-
-            r = s.get(url, timeout=5)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = []
+			
+        for line in lines:
+        
+            # Checking if the HTTP/HTTPS URI Scheme is present
+            if 'http://' in line.strip() or 'https://' in line.strip():
+                url = line.strip()
+            else:
+                # Add http:// if not given
+                url = 'http://' + line.strip()
             
-            display_response(url, r.status_code)
+            futures.append(
+                executor.submit(
+                    get_response, url=url, timeout=3
+                )
+            )
 
-            out.write('[' + str(r.status_code) + ']: ' + url + '\n')
+        for future in tqdm(concurrent.futures.as_completed(futures)):
+            try:
+                future.result()
 
-        except requests.ConnectionError as e:
-            print("\n", colors.FAIL + "[!] : Connection ERROR (Max retries exceeded) on : " + colors.ENDC + url)
-            continue
+                # r = get_response(url, timeout=5)
+                
+                # display_response(url, r.status_code)
 
-        except requests.Timeout as e:
-            print("[!] : Timeout Error")
-            continue
+                # out.write('[' + str(r.status_code) + ']: ' + url + '\n')
+                out.write(future.result())
 
-        except requests.RequestException as e:
-            print("[!] : General Error")
-            continue
+            except requests.ConnectionError as e:
+                print("\n", colors.FAIL + "[!] : Connection ERROR (Max retries exceeded) on : " + colors.ENDC + url)
+                continue
 
-        except KeyboardInterrupt:
-            out.close()
-            print("\nOutput saved in : " + output_file + '\n')
-            exit()
+            except requests.Timeout as e:
+                print("[!] : Timeout Error")
+                continue
+
+            except requests.RequestException as e:
+                print("[!] : General Error")
+                continue
+
+            except KeyboardInterrupt:
+                out.close()
+                print("\nOutput saved in : " + output_file + '\n')
+                exit()
 
 
     #if (('<script' in r.text) and (len(r.text) > 2)):
@@ -133,4 +150,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main() 
+	#print_ascii_title()
+	main()

@@ -11,6 +11,7 @@ import argparse
 from datetime import datetime
 import logging
 from tqdm import tqdm
+import os
 
 def print_ascii_title():
 	print('''
@@ -92,15 +93,18 @@ def main():
 
     with open(input_file, 'r') as f:
         lines = f.readlines()
-
-    out = open(output_file, 'w+')
+    
+    if not os.path.exists('output_files'):
+        os.mkdir('output_files')
+    
+    out = open(output_file, 'w')
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = []
 			
         for line in lines:
         
-            # Checking if the HTTP/HTTPS URI Scheme is present
+            # Check if the HTTP/HTTPS URI Scheme is present
             if 'http://' in line.strip() or 'https://' in line.strip():
                 url = line.strip()
             else:
